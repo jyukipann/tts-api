@@ -50,3 +50,8 @@ curl -F "ref_audio=@voice.wav" -F "text=こんにちは。テストです。" ht
 - `TTS_MODEL_ID`（既定: `Qwen/Qwen3-TTS-12Hz-0.6B-Base`）
 - `TTS_DEVICE`（既定: 自動。MPS があれば `mps`）
 - `TTS_DTYPE`（既定: `float16`）
+
+## トラブルシュート
+
+- MPS で落ちる/変な音になる場合: `TTS_DTYPE=float32` を試してください（遅くなります）。
+- それでも難しい場合: `TTS_DEVICE=cpu` で動作確認してください。
