@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import logging
 import tempfile
 from pathlib import Path
 
 import soundfile as sf
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -14,6 +15,7 @@ from tts_api.settings import Settings
 
 app = FastAPI(title="tts-api", version="0.1.0")
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
+logger = logging.getLogger("tts_api")
 
 settings = Settings()
 tts = TTSService(settings)
@@ -81,12 +83,17 @@ async def _synthesize(
         tmp.write(await ref_audio.read())
 
     try:
-        generated = await tts.synthesize_voice_clone(
-            ref_audio_path=tmp_path,
-            text=text,
-            language=language,
-            ref_text=ref_text,
-        )
+        try:
+            generated = await tts.synthesize_voice_clone(
+                ref_audio_path=tmp_path,
+                text=text,
+                language=language,
+                ref_text=ref_text,
+            )
+        except Exception as e:
+            logger.exception("TTS failed")
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
         with tempfile.SpooledTemporaryFile() as buf:
             sf.write(buf, generated.wav, generated.sample_rate, format="WAV")
             buf.seek(0)

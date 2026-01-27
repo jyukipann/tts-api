@@ -114,6 +114,21 @@ class TTSService:
             except RuntimeError as e:
                 msg = str(e)
                 is_prob_nan = "probability tensor contains" in msg or "nan" in msg.lower()
+                if is_prob_nan:
+                    # Retry with greedy decoding to avoid multinomial errors.
+                    try:
+                        return await asyncio.to_thread(
+                            _generate_voice_clone,
+                            self._model,
+                            ref_audio_path,
+                            text,
+                            language,
+                            (ref_text or "").strip(),
+                            do_sample=False,
+                        )
+                    except RuntimeError:
+                        pass
+
                 if self._device == "mps" and (self._dtype_name or "").lower() == "float16" and is_prob_nan:
                     # MPS+fp16 can be numerically unstable on some prompts; retry with fp32.
                     self.reload(dtype_name="float32")
@@ -152,25 +167,28 @@ def _generate_voice_clone(
     text: str,
     language: str,
     ref_text: str,
+    *,
+    do_sample: bool | None = None,
 ) -> GeneratedAudio:
     if model is None:
         raise RuntimeError("Model not loaded.")
-    create_prompt = getattr(model, "create_voice_clone_prompt", None)
     generate = getattr(model, "generate_voice_clone", None)
-    if not callable(create_prompt) or not callable(generate):
+    if not callable(generate):
         raise RuntimeError("Loaded model does not expose voice-clone APIs.")
 
     x_vector_only_mode = not bool(ref_text)
-    prompt = create_prompt(
-        ref_audio=ref_audio_path,
-        ref_text=ref_text,
-        x_vector_only_mode=x_vector_only_mode,
-    )
+    kwargs: dict = {}
+    if do_sample is not None:
+        kwargs["do_sample"] = do_sample
+
     wavs, sample_rate = generate(
         text=text,
-        voice_clone_prompt=prompt,
         language=language,
+        ref_audio=ref_audio_path,
+        ref_text=(ref_text or None),
+        x_vector_only_mode=x_vector_only_mode,
         non_streaming_mode=True,
+        **kwargs,
     )
     if not wavs:
         raise RuntimeError("No audio generated.")
