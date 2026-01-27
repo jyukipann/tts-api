@@ -27,6 +27,10 @@ class TTSService:
         self._device: DeviceLiteral | None = None
 
     @property
+    def is_loaded(self) -> bool:
+        return self._model is not None
+
+    @property
     def device(self) -> DeviceLiteral | None:
         return self._device
 
@@ -66,6 +70,14 @@ class TTSService:
 
         self._device = device
 
+    async def ensure_loaded(self) -> None:
+        if self._model is not None:
+            return
+        async with self._lock:
+            if self._model is not None:
+                return
+            await asyncio.to_thread(self.load)
+
     async def synthesize_voice_clone(
         self,
         *,
@@ -74,8 +86,7 @@ class TTSService:
         language: str = "Japanese",
         ref_text: str | None = None,
     ) -> GeneratedAudio:
-        if self._model is None:
-            raise RuntimeError("Model not loaded. Call load() first.")
+        await self.ensure_loaded()
 
         async with self._lock:
             return await asyncio.to_thread(
@@ -113,6 +124,8 @@ def _generate_voice_clone(
     language: str,
     ref_text: str,
 ) -> GeneratedAudio:
+    if model is None:
+        raise RuntimeError("Model not loaded.")
     create_prompt = getattr(model, "create_voice_clone_prompt", None)
     generate = getattr(model, "generate_voice_clone", None)
     if not callable(create_prompt) or not callable(generate):

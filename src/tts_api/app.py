@@ -20,8 +20,9 @@ tts = TTSService(settings)
 
 
 @app.on_event("startup")
-def _startup() -> None:
-    tts.load()
+async def _startup() -> None:
+    if settings.eager_load:
+        await tts.ensure_loaded()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -37,7 +38,13 @@ def index(request: Request) -> HTMLResponse:
 
 @app.get("/health")
 def health() -> dict:
-    return {"ok": True, "model_id": settings.model_id, "device": tts.device}
+    return {
+        "ok": True,
+        "model_id": settings.model_id,
+        "device": tts.device,
+        "loaded": tts.is_loaded,
+        "eager_load": settings.eager_load,
+    }
 
 
 @app.post("/tts")

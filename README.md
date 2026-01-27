@@ -28,6 +28,8 @@ uv run uvicorn tts_api.app:app --host 127.0.0.1 --port 8000
 
 - Web UI: `http://127.0.0.1:8000/`
 
+モデルは既定で **初回リクエスト時に lazy-load** します。起動時にロードしたい場合は `TTS_EAGER_LOAD=true` を指定してください。
+
 ## API
 
 `POST /api/tts`（`multipart/form-data`）
@@ -50,6 +52,7 @@ curl -F "ref_audio=@voice.wav" -F "text=こんにちは。テストです。" ht
 - `TTS_MODEL_ID`（既定: `Qwen/Qwen3-TTS-12Hz-0.6B-Base`）
 - `TTS_DEVICE`（既定: 自動。MPS があれば `mps`）
 - `TTS_DTYPE`（既定: `float16`）
+- `TTS_EAGER_LOAD`（既定: `false`）
 
 ## トラブルシュート
 
