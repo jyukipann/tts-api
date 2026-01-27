@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tts-api</title>
+    <style>
+      body { font-family: -apple-system, system-ui, sans-serif; margin: 24px; max-width: 900px; }
+      .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; }
+      label { display:block; margin-top: 12px; font-weight: 600; }
+      input[type="text"], textarea, select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 10px; }
+      textarea { min-height: 140px; }
+      button { margin-top: 16px; padding: 10px 14px; border: 0; border-radius: 10px; background: #111827; color: white; font-weight: 700; cursor: pointer; }
+      small { color: #6b7280; }
+      .meta { color: #374151; font-size: 14px; margin-bottom: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>tts-api</h1>
+    <div class="meta">model: {{ model_id }} / device: {{ device }}</div>
+
+    <div class="card">
+      <form action="/tts" method="post" enctype="multipart/form-data">
+        <label>参照音声（ボイス元データ）</label>
+        <input type="file" name="ref_audio" accept="audio/*" required />
+        <small>wav 推奨。長すぎない音声（数秒〜十数秒）から試してください。</small>
+
+        <label>参照音声の文字起こし（任意）</label>
+        <input type="text" name="ref_text" placeholder="（任意）参照音声で話している内容" />
+        <small>あると安定することがあります。無い場合は音声特徴のみでクローンします。</small>
+
+        <label>話させたいテキスト</label>
+        <textarea name="text" required placeholder="ここに日本語テキストを入力"></textarea>
+
+        <label>言語</label>
+        <select name="language">
+          <option value="Japanese" selected>Japanese</option>
+          <option value="Auto">Auto</option>
+          <option value="English">English</option>
+          <option value="Chinese">Chinese</option>
+        </select>
+
+        <button type="submit">WAV を生成してダウンロード</button>
+      </form>
+    </div>
+  </body>
+</html>
+
