@@ -28,6 +28,14 @@ uv run uvicorn tts_api.app:app --host 127.0.0.1 --port 8000
 
 - Web UI: `http://127.0.0.1:8000/`
 
+LAN に公開する場合:
+
+```bash
+HF_HOME="$PWD/.cache/huggingface" uv run uvicorn tts_api.app:app --host 0.0.0.0 --port 8010
+```
+
+macOS のファイアウォール許可が出たら許可してください。
+
 モデルは既定で **初回リクエスト時に lazy-load** します。起動時にロードしたい場合は `TTS_EAGER_LOAD=true` を指定してください。
 
 ## API
@@ -59,3 +67,12 @@ curl -F "ref_audio=@voice.wav" -F "text=こんにちは。テストです。" ht
 - 速度優先: `TTS_DTYPE=float16`（MPS で不安定になる場合があります）。
 - 安定優先: `TTS_DTYPE=float32`（既定。遅くなります）。
 - それでも難しい場合: `TTS_DEVICE=cpu` で動作確認してください。
+
+参照音声について:
+
+- まずは **短め（3〜15秒程度）** のクリアな音声（ノイズ/残響少なめ）から試すのがおすすめです。
+- `ref_text`（参照音声の文字起こし）を入れると安定することがあります。
+
+SoX の警告が出る場合:
+
+- `brew install sox` で解消することがあります（モデル側の音声処理で使われる場合があります）。
