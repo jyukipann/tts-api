@@ -42,6 +42,7 @@ def health() -> dict:
         "ok": True,
         "model_id": settings.model_id,
         "device": tts.device,
+        "dtype": tts.dtype,
         "loaded": tts.is_loaded,
         "eager_load": settings.eager_load,
     }

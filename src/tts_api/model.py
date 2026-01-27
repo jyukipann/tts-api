@@ -25,6 +25,7 @@ class TTSService:
         self._lock = asyncio.Lock()
         self._model = None
         self._device: DeviceLiteral | None = None
+        self._dtype_name: str | None = None
 
     @property
     def is_loaded(self) -> bool:
@@ -34,7 +35,11 @@ class TTSService:
     def device(self) -> DeviceLiteral | None:
         return self._device
 
-    def load(self) -> None:
+    @property
+    def dtype(self) -> str | None:
+        return self._dtype_name
+
+    def load(self, *, dtype_name_override: str | None = None) -> None:
         import torch
         from qwen_tts import Qwen3TTSModel
 
@@ -46,7 +51,7 @@ class TTSService:
         else:
             device = "mps" if torch.backends.mps.is_available() else "cpu"
 
-        dtype_name = (self._settings.dtype or "float16").lower()
+        dtype_name = (dtype_name_override or self._settings.dtype or "float16").lower()
         dtype = {
             "float16": torch.float16,
             "float32": torch.float32,
@@ -54,6 +59,7 @@ class TTSService:
         }.get(dtype_name, torch.float16)
 
         os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+        os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
 
         try:
             self._model = Qwen3TTSModel.from_pretrained(
@@ -69,6 +75,13 @@ class TTSService:
             _maybe_to_device(self._model, device)
 
         self._device = device
+        self._dtype_name = dtype_name
+
+    def reload(self, *, dtype_name: str) -> None:
+        self._model = None
+        self._device = None
+        self._dtype_name = None
+        self.load(dtype_name_override=dtype_name)
 
     async def ensure_loaded(self) -> None:
         if self._model is not None:
@@ -89,14 +102,30 @@ class TTSService:
         await self.ensure_loaded()
 
         async with self._lock:
-            return await asyncio.to_thread(
-                _generate_voice_clone,
-                self._model,
-                ref_audio_path,
-                text,
-                language,
-                (ref_text or "").strip(),
-            )
+            try:
+                return await asyncio.to_thread(
+                    _generate_voice_clone,
+                    self._model,
+                    ref_audio_path,
+                    text,
+                    language,
+                    (ref_text or "").strip(),
+                )
+            except RuntimeError as e:
+                msg = str(e)
+                is_prob_nan = "probability tensor contains" in msg or "nan" in msg.lower()
+                if self._device == "mps" and (self._dtype_name or "").lower() == "float16" and is_prob_nan:
+                    # MPS+fp16 can be numerically unstable on some prompts; retry with fp32.
+                    self.reload(dtype_name="float32")
+                    return await asyncio.to_thread(
+                        _generate_voice_clone,
+                        self._model,
+                        ref_audio_path,
+                        text,
+                        language,
+                        (ref_text or "").strip(),
+                    )
+                raise
 
 
 def _maybe_to_device(model: object, device: DeviceLiteral) -> None:
@@ -141,6 +170,7 @@ def _generate_voice_clone(
         text=text,
         voice_clone_prompt=prompt,
         language=language,
+        non_streaming_mode=True,
     )
     if not wavs:
         raise RuntimeError("No audio generated.")

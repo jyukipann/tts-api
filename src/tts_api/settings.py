@@ -8,5 +8,5 @@ class Settings(BaseSettings):
 
     model_id: str = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
     device: str | None = None  # e.g. "mps", "cpu"
-    dtype: str = "float16"  # "float16" | "float32" | "bfloat16"
+    dtype: str = "float32"  # Prefer stability on MPS; override with TTS_DTYPE
     eager_load: bool = False
