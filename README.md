@@ -1,78 +1,112 @@
 # tts-api
 
-Mac（MPS）で **Qwen3-TTS のボイスクローン**をローカル実行し、FastAPI 経由で `.wav` を返す API + 簡易 Web UI です。
+Mac（MPS）で **Qwen3-TTS のボイスクローン**をローカル実行し、FastAPI 経由で `.wav` を返す API + 簡易 Web UI。
 
-想定モデルは Hugging Face の公式 `Qwen/Qwen3-TTS-12Hz-0.6B-Base`（日本語対応）です。
-
-## 前提
-
-- macOS（Apple Silicon 推奨）
-- `uv`（Python パッケージ/環境管理）
+- ポート: **8010**（LAN 公開）/ 8000（localhost のみ）
+- モデル: `Qwen/Qwen3-TTS-12Hz-0.6B-Base`
 
 ## セットアップ
 
 ```bash
-uv venv --python 3.12
-source .venv/bin/activate
 uv sync
+cp .env.example .env  # 必要に応じて編集
 ```
 
-初回起動時に Hugging Face からモデルがダウンロードされます。
-環境変数は `.env` でも指定できます（例は `.env.example`）。
+初回リクエスト時に HuggingFace からモデルが自動ダウンロードされます。
 
-## 起動
+---
+
+## 手動起動
 
 ```bash
+# localhost のみ
 uv run uvicorn tts_api.app:app --host 127.0.0.1 --port 8000
-```
 
-- Web UI: `http://127.0.0.1:8000/`
-
-LAN に公開する場合:
-
-```bash
+# LAN 公開
 HF_HOME="$PWD/.cache/huggingface" uv run uvicorn tts_api.app:app --host 0.0.0.0 --port 8010
 ```
 
-macOS のファイアウォール許可が出たら許可してください。
+Web UI: `http://127.0.0.1:8010/`
 
-モデルは既定で **初回リクエスト時に lazy-load** します。起動時にロードしたい場合は `TTS_EAGER_LOAD=true` を指定してください。
+---
 
-## API
+## サービス化（launchd）
 
-`POST /api/tts`（`multipart/form-data`）
-
-- `ref_audio`: 参照音声ファイル（推奨: wav）
-- `text`: 話させたいテキスト
-- `ref_text`(optional): 参照音声の文字起こし（あると精度/安定性が上がることがあります）
-- `language`(optional): 既定 `Japanese`
-
-例:
+ログイン時に自動起動するサービスとして登録する。
 
 ```bash
-curl -F "ref_audio=@voice.wav" -F "text=こんにちは。テストです。" http://127.0.0.1:8000/api/tts -o out.wav
+# 1. plist をインストール
+cp scripts/com.jyukipann.tts-api.plist ~/Library/LaunchAgents/
+
+# 2. 登録・起動
+launchctl load ~/Library/LaunchAgents/com.jyukipann.tts-api.plist
+
+# 3. 動作確認
+curl http://localhost:8010/health
 ```
 
-## 設定（環境変数）
+### サービス管理コマンド
 
-`TTS_` プレフィックスで設定できます（例: `TTS_MODEL_ID`）。
+```bash
+# 停止
+launchctl unload ~/Library/LaunchAgents/com.jyukipann.tts-api.plist
 
-- `TTS_MODEL_ID`（既定: `Qwen/Qwen3-TTS-12Hz-0.6B-Base`）
-- `TTS_DEVICE`（既定: 自動。MPS があれば `mps`）
-- `TTS_DTYPE`（既定: `float32`）
-- `TTS_EAGER_LOAD`（既定: `false`）
+# 再起動
+launchctl unload ~/Library/LaunchAgents/com.jyukipann.tts-api.plist
+launchctl load   ~/Library/LaunchAgents/com.jyukipann.tts-api.plist
+
+# ログ確認
+tail -f server.log
+```
+
+> **plist のパスを変えた場合**は `WorkingDirectory` と `ProgramArguments` の `/Users/juki/Workspace/tts` を実際のパスに合わせて編集してください。
+
+---
+
+## CLI（curl）
+
+### ボイスクローン
+
+```bash
+curl -s \
+  -F "ref_audio=@voice.wav" \
+  -F "text=こんにちは。テストです。" \
+  http://localhost:8010/api/tts \
+  -o output.wav
+```
+
+### ref_text を渡すと精度が上がることがある
+
+```bash
+curl -s \
+  -F "ref_audio=@voice.wav" \
+  -F "ref_text=参照音声の文字起こし" \
+  -F "text=話させたいテキスト" \
+  -F "language=Japanese" \
+  http://localhost:8010/api/tts \
+  -o output.wav
+```
+
+### ヘルスチェック
+
+```bash
+curl http://localhost:8010/health
+```
+
+---
+
+## 環境変数（`TTS_` プレフィックス）
+
+| 変数 | デフォルト | 説明 |
+|------|-----------|------|
+| `TTS_MODEL_ID` | `Qwen/Qwen3-TTS-12Hz-0.6B-Base` | モデル |
+| `TTS_DEVICE` | 自動（MPS → CPU） | `mps` / `cpu` |
+| `TTS_DTYPE` | `float32` | `float32` / `float16` |
+| `TTS_EAGER_LOAD` | `false` | 起動時ロード |
 
 ## トラブルシュート
 
-- 速度優先: `TTS_DTYPE=float16`（MPS で不安定になる場合があります）。
-- 安定優先: `TTS_DTYPE=float32`（既定。遅くなります）。
-- それでも難しい場合: `TTS_DEVICE=cpu` で動作確認してください。
-
-参照音声について:
-
-- まずは **短め（3〜15秒程度）** のクリアな音声（ノイズ/残響少なめ）から試すのがおすすめです。
-- `ref_text`（参照音声の文字起こし）を入れると安定することがあります。
-
-SoX の警告が出る場合:
-
-- `brew install sox` で解消することがあります（モデル側の音声処理で使われる場合があります）。
+- **速度優先**: `TTS_DTYPE=float16`（MPS で不安定になる場合あり）
+- **安定優先**: `TTS_DTYPE=float32`（デフォルト）
+- **動作確認**: `TTS_DEVICE=cpu`
+- **SoX 警告**: `brew install sox` で解消
