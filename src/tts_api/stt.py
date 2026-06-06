@@ -29,11 +29,29 @@ class STTService:
     async def transcribe(self, audio_path: Path) -> dict[str, str]:
         """音声ファイルを文字起こしして {"text": ..., "language": ...} を返す。"""
         await self.ensure_loaded()
+        import mlx.core as mx
         import mlx_whisper
+        import soundfile as sf
+
+        # mlx_whisper 0.4.3 + mlx 0.31.x の互換性バグ修正:
+        # stft() が list を as_strided に渡すが 0.31 は tuple を要求する
+        _orig_as_strided = mx.as_strided
+
+        def _patched_as_strided(a, shape=None, strides=None, offset=0, **kwargs):
+            shape = tuple(shape) if isinstance(shape, list) else shape
+            strides = tuple(strides) if isinstance(strides, list) else strides
+            # MLX 0.31+ では位置引数で渡す必要がある
+            return _orig_as_strided(a, shape, strides, offset, **kwargs)
+
+        mx.as_strided = _patched_as_strided
+
+        # soundfile で numpy array に変換して渡す（ffmpeg 依存を回避）
+        # normalize_to_wav が 16kHz/16bit WAV を保証しているので resample 不要
+        audio_array, _ = sf.read(str(audio_path), dtype="float32", always_2d=False)
 
         result: dict = await asyncio.to_thread(
             mlx_whisper.transcribe,
-            str(audio_path),
+            audio_array,
             path_or_hf_repo=self._settings.stt_model_id,
             verbose=False,
         )
