@@ -6,7 +6,7 @@
     <string>com.jyukipann.tts-api</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/juki/Workspace/tts/.venv/bin/uvicorn</string>
+        <string>/Users/YOUR_USERNAME/path/to/tts-api/.venv/bin/uvicorn</string>
         <string>tts_api.app:app</string>
         <string>--host</string>
         <string>0.0.0.0</string>
@@ -14,19 +14,19 @@
         <string>8010</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>/Users/juki/Workspace/tts</string>
+    <string>/Users/YOUR_USERNAME/path/to/tts-api</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>HF_HOME</key>
-        <string>/Users/juki/Workspace/tts/.cache/huggingface</string>
+        <string>/Users/YOUR_USERNAME/path/to/tts-api/.cache/huggingface</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/juki/Workspace/tts/server.log</string>
+    <string>/Users/YOUR_USERNAME/path/to/tts-api/server.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/juki/Workspace/tts/server.log</string>
+    <string>/Users/YOUR_USERNAME/path/to/tts-api/server.log</string>
 </dict>
 </plist>

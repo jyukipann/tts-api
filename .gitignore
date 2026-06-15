@@ -1,4 +1,7 @@
 .DS_Store
+samples/*.wav
+samples/*.mp3
+samples/*.m4a
 .env
 .venv/
 __pycache__/
